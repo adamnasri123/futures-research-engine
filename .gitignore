@@ -1,0 +1,28 @@
+# Secrets — never commit these
+.env
+.claude
+
+# Live trading logs (contain account number + real P&L) — never publish
+logs/
+
+# Cached market data (large, third-party data — not ours to redistribute)
+backtest/cache/
+*.parquet
+
+# Virtual environment
+venv/
+ 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
