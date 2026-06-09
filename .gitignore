@@ -26,3 +26,7 @@ build/
 # IDEs
 .vscode/
 .idea/
+
+# Runtime state
+STOP_BOT
+dashboard/state.json

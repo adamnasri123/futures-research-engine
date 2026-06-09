@@ -1,5 +1,5 @@
 import requests
-from auth import get_session_token
+from topstep.auth import get_session_token
 
 CONTRACTS_URL = "https://api.topstepx.com/api/Contract/available"
 

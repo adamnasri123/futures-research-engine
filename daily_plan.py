@@ -17,10 +17,10 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from auth import get_session_token
-from accounts import get_accounts
-from contracts import CONTRACTS
-from history import get_bars, DAY
+from topstep.auth import get_session_token
+from topstep.accounts import get_accounts
+from topstep.contracts import CONTRACTS
+from topstep.history import get_bars, DAY
 from backtest.regime import _adx, _choppiness, ADX_TREND, ADX_CHOP, CHOP_TREND, CHOP_CHOP
 from backtest.news import FOMC_DAYS, nfp_days_for_range, FOMC_ANNOUNCE_MIN
 import live_config as cfg
@@ -133,7 +133,7 @@ def _print_rules():
     Entry        : break of last {cfg.BREAKOUT_N}-bar high (long) / low (short),
                    in the bias direction; fill next bar
     Stop         : {cfg.STOP_ATR} x ATR({cfg.ATR_PERIOD}) from entry (protective)
-    Trail/exit   : close back through the {cfg.EMA_EXIT}-EMA, OR stop hit,
+    Exit         : fixed 2:1 target, OR stop hit,
                    OR flat by {cfg.FLAT_MIN//60}:{cfg.FLAT_MIN%60:02d} ET
     Entry window : {cfg.ENTRY_START_MIN//60}:{cfg.ENTRY_START_MIN%60:02d}
                    to {cfg.ENTRY_END_MIN//60}:{cfg.ENTRY_END_MIN%60:02d} ET only

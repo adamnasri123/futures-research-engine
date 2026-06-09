@@ -14,10 +14,10 @@ from zoneinfo import ZoneInfo
 
 import time
 
-from accounts import get_accounts
-from trades import search_trades
-from positions import search_open_positions, close_position
-from orders import place_order, search_open_orders, STOP, TRAILING_STOP, MARKET, BID, ASK
+from topstep.accounts import get_accounts
+from topstep.trades import search_trades
+from topstep.positions import search_open_positions, close_position
+from topstep.orders import place_order, search_open_orders, STOP, TRAILING_STOP, MARKET, BID, ASK
 import live_config as cfg
 
 
@@ -155,7 +155,7 @@ def force_flat_if_needed(token: str, account_id: int) -> list[str]:
     actions = []
     if _now_min_et() < cfg.FLAT_MIN:
         return actions
-    from positions import close_position
+    from topstep.positions import close_position
     pos = search_open_positions(token, account_id)
     for p in pos:
         close_position(token, account_id, p["contractId"])
@@ -165,7 +165,7 @@ def force_flat_if_needed(token: str, account_id: int) -> list[str]:
 
 if __name__ == "__main__":
     # Dry status: show preflight verdict without placing anything.
-    from auth import get_session_token
+    from topstep.auth import get_session_token
     token = get_session_token()
     accts = get_accounts(token)
     if not accts:

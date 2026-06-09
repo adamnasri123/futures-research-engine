@@ -8,10 +8,10 @@ Usage:
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from auth import get_session_token
-from accounts import get_accounts
-from trades import search_trades
-from positions import search_open_positions, POSITION_TYPE
+from topstep.auth import get_session_token
+from topstep.accounts import get_accounts
+from topstep.trades import search_trades
+from topstep.positions import search_open_positions, POSITION_TYPE
 import live_config as cfg
 
 

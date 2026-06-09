@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TopStep Bot — Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0c0f14; --panel: #141a23; --panel2: #1a2230; --line: #232d3d;
+    --text: #d7e0ec; --dim: #7c889b; --dim2: #8b97a8;
+    --green: #2ecc71; --red: #ff5c5c; --amber: #f5b942; --blue: #4da3ff;
+    --mono: "Cascadia Code", "Consolas", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; padding: 14px 22px;
+           border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .5px; font-weight: 600; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dim2); }
+  .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.stopped { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  #clock { margin-left: auto; color: var(--dim2); font-family: var(--mono); font-size: 13px; }
+  main { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px;
+         padding: 18px 22px; max-width: 1280px; margin: 0 auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 12px; text-transform: uppercase;
+             letter-spacing: 1.2px; color: var(--dim2); font-weight: 600; }
+  .span4 { grid-column: span 4; } .span6 { grid-column: span 6; }
+  .span8 { grid-column: span 8; } .span12 { grid-column: span 12; }
+  @media (max-width: 900px) { .span4, .span6, .span8 { grid-column: span 12; } }
+  .big { font-size: 26px; font-family: var(--mono); font-weight: 600; }
+  .sub { color: var(--dim2); font-size: 12.5px; margin-top: 4px; }
+  .pos { color: var(--green); } .neg { color: var(--red); } .warn { color: var(--amber); }
+  .bar { height: 10px; background: var(--panel2); border-radius: 6px; overflow: hidden;
+         margin-top: 10px; }
+  .bar > div { height: 100%; border-radius: 6px; transition: width .6s; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+  th { text-align: left; color: var(--dim2); font-weight: 500; padding: 4px 8px;
+       border-bottom: 1px solid var(--line); font-size: 11.5px; text-transform: uppercase; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--panel2); }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 11.5px;
+          font-weight: 600; }
+  .pill.buy { background: rgba(46,204,113,.15); color: var(--green); }
+  .pill.sell { background: rgba(255,92,92,.15); color: var(--red); }
+  #log { font-family: var(--mono); font-size: 12px; white-space: pre-wrap;
+         background: var(--panel2); border-radius: 8px; padding: 12px;
+         max-height: 260px; overflow-y: auto; color: var(--dim2); }
+  button { border: 0; border-radius: 8px; padding: 10px 18px; font-size: 14px;
+           font-weight: 600; cursor: pointer; }
+  #stopBtn { background: var(--red); color: #fff; }
+  #stopBtn.resume { background: var(--amber); color: #1c1c1c; }
+  #briefBtn { background: var(--blue); color: #fff; }
+  button:active { transform: translateY(1px); }
+  .btnrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #msg { font-size: 13px; color: var(--amber); }
+  .err { color: var(--red); font-family: var(--mono); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="botDot"></div>
+  <h1>TopStep Bot</h1>
+  <span class="sub" id="botState">connecting…</span>
+  <span id="clock"></span>
+</header>
+
+<main>
+  <div class="card span4">
+    <h2>Account</h2>
+    <div class="big" id="balance">—</div>
+    <div class="sub" id="acctName"></div>
+    <div class="sub">MLL cushion <span id="cushionTxt"></span></div>
+    <div class="bar"><div id="cushionBar" style="background:var(--green);width:0%"></div></div>
+    <div class="sub" id="mllDetail"></div>
+  </div>
+
+  <div class="card span4">
+    <h2>Today's P&amp;L</h2>
+    <div class="big" id="dayNet">—</div>
+    <div class="sub" id="dayDetail"></div>
+    <div class="bar"><div id="capBar" style="background:var(--blue);width:0%"></div></div>
+    <div class="sub" id="capDetail"></div>
+  </div>
+
+  <div class="card span4">
+    <h2>Controls</h2>
+    <div class="btnrow">
+      <button id="stopBtn" onclick="stopBot()">STOP BOT</button>
+      <button id="briefBtn" onclick="copyBriefing()">Copy analyst briefing</button>
+    </div>
+    <div class="sub" id="botCfg"></div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card span8">
+    <h2>Today's fills</h2>
+    <table id="fills"><thead><tr>
+      <th>time (UTC)</th><th>side</th><th>size</th><th>price</th><th>P&amp;L</th><th>fees</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="sub" id="noFills" style="display:none">No fills today.</div>
+  </div>
+
+  <div class="card span4">
+    <h2>Open position</h2>
+    <div id="positions" class="sub">—</div>
+    <h2 style="margin-top:16px">Working orders</h2>
+    <div id="orders" class="sub">—</div>
+  </div>
+
+  <div class="card span12">
+    <h2>Bot log (today)</h2>
+    <div id="log">no log yet</div>
+    <div class="err" id="error"></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (x, d=2) => x == null ? "—" :
+  x.toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+const money = x => (x < 0 ? "-$" : "$") + fmt(Math.abs(x));
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/state");
+    const s = await r.json();
+    if (!s.ok) throw new Error(s.error);
+    $("error").textContent = "";
+    $("clock").textContent = s.now_et;
+
+    // bot status
+    const stopped = s.bot.stop_flag;
+    $("botDot").className = "dot " + (stopped ? "stopped" : (s.bot.running ? "on" : ""));
+    $("botState").textContent = stopped ? "STOP flag set" :
+        (s.bot.running ? "bot running" : "bot idle (not running now)");
+    $("botCfg").textContent =
+        `size ${s.bot.live_size} micros · entries ${s.bot.entry_window} · flat 15:55 ET`;
+    const b = $("stopBtn");
+    b.textContent = stopped ? "RESUME (clear stop)" : "STOP BOT";
+    b.className = stopped ? "resume" : "";
+
+    // account
+    const a = s.account;
+    $("balance").textContent = money(a.balance);
+    $("acctName").textContent = a.name;
+    const cu = Math.max(0, a.mll_cushion), pct = Math.min(100, cu / a.trailing_mll * 100);
+    $("cushionTxt").textContent = money(cu) + " of " + money(a.trailing_mll);
+    const cb = $("cushionBar");
+    cb.style.width = pct + "%";
+    cb.style.background = pct > 50 ? "var(--green)" : pct > 25 ? "var(--amber)" : "var(--red)";
+    $("mllDetail").textContent =
+        `peak ${money(a.peak_balance)} · MLL floor ${money(a.mll_floor)}`;
+
+    // today P&L
+    const t = s.today;
+    const dn = $("dayNet");
+    dn.textContent = money(t.net);
+    dn.className = "big " + (t.net > 0 ? "pos" : t.net < 0 ? "neg" : "");
+    $("dayDetail").textContent =
+        `realized ${money(t.realized)} · fees ${money(t.fees)}`;
+    const used = t.net < 0 ? Math.min(100, -t.net / t.loss_cap * 100)
+                           : Math.min(100, t.net / t.profit_cap * 100);
+    const capb = $("capBar");
+    capb.style.width = used + "%";
+    capb.style.background = t.net < 0 ? "var(--red)" : "var(--green)";
+    $("capDetail").textContent = t.net < 0
+        ? `${used.toFixed(0)}% of -$${t.loss_cap} daily loss cap`
+        : `${used.toFixed(0)}% of +$${t.profit_cap} daily profit cap`;
+
+    // fills
+    const tb = $("fills").querySelector("tbody");
+    tb.innerHTML = "";
+    for (const f of s.fills) {
+      const tr = document.createElement("tr");
+      const pnl = f.pnl == null ? "entry" : money(f.pnl);
+      const cls = f.pnl == null ? "" : (f.pnl >= 0 ? "pos" : "neg");
+      tr.innerHTML = `<td>${f.time_et.replace("T", " ")}</td>
+        <td><span class="pill ${f.side === "BUY" ? "buy" : "sell"}">${f.side}</span></td>
+        <td>${f.size}</td><td>${fmt(f.price)}</td>
+        <td class="${cls}">${pnl}</td><td>${fmt(f.fees)}</td>`;
+      tb.appendChild(tr);
+    }
+    $("noFills").style.display = s.fills.length ? "none" : "block";
+
+    // positions / orders
+    $("positions").innerHTML = s.positions.length
+      ? s.positions.map(p =>
+          `${p.size > 0 ? "LONG" : "SHORT"} ${Math.abs(p.size)} ${p.contract} @ ${fmt(p.avg_price)}`
+        ).join("<br>")
+      : "flat";
+    $("orders").innerHTML = s.open_orders.length
+      ? s.open_orders.map(o =>
+          `#${o.id} ${o.status} size ${o.size} ` +
+          (o.stop != null ? `stop ${fmt(o.stop)}` : "") +
+          (o.limit != null ? `limit ${fmt(o.limit)}` : "")
+        ).join("<br>")
+      : "none";
+
+    // log
+    const lg = $("log");
+    const atBottom = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 8;
+    lg.textContent = s.log.length ? s.log.join("\n") : "no log yet today";
+    if (atBottom) lg.scrollTop = lg.scrollHeight;
+  } catch (e) {
+    $("error").textContent = "dashboard error: " + e.message;
+  }
+}
+
+async function stopBot() {
+  const stopped = $("stopBtn").classList.contains("resume");
+  if (!stopped && !confirm(
+      "STOP the bot?\n\nIt will flatten any open position (live mode) and exit " +
+      "within ~45 seconds. It will NOT restart until the flag is cleared."))
+    return;
+  const r = await fetch(stopped ? "/api/resume" : "/api/stop", {method: "POST"});
+  const j = await r.json();
+  $("msg").textContent = j.msg;
+  refresh();
+}
+
+async function copyBriefing() {
+  const r = await fetch("/api/briefing");
+  const j = await r.json();
+  if (!j.ok) { $("msg").textContent = "briefing failed: " + j.error; return; }
+  await navigator.clipboard.writeText(j.text);
+  $("msg").textContent =
+    "Briefing copied — paste it to Claude Code (VS Code Claude panel) in the topstep-bot project.";
+}
+
+refresh();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>

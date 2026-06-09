@@ -6,7 +6,7 @@ SAFETY: DRY-RUN by default. It will NOT place a real order unless you pass --liv
 In dry-run it makes every real decision and LOGS the exact order it WOULD send.
 Run it dry for several days, read the logs, and only then consider --live.
 
-Honest reminder: the entry signal has NO proven edge (see STRATEGY.md). The risk
+Honest reminder: the entry signal has NO proven edge (see docs/STRATEGY.md). The risk
 caps and guardrails (live_guard.py) are the real protection.
 
 Flow each day:
@@ -21,6 +21,7 @@ Usage:
   python autotrader.py            # DRY-RUN (default, safe)
   python autotrader.py --live     # places real orders (after dry-run is proven)
 """
+import os
 import sys
 import time
 import traceback
@@ -29,16 +30,16 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from auth import get_session_token
-from accounts import get_accounts
-from contracts import CONTRACTS
-from history import get_bars, MINUTE
-from orders import BID, ASK
+from topstep.auth import get_session_token
+from topstep.accounts import get_accounts
+from topstep.contracts import CONTRACTS
+from topstep.history import get_bars, MINUTE
+from topstep.orders import BID, ASK
 import live_config as cfg
 import live_guard as guard
 from backtest.regime import _adx, _choppiness, ADX_TREND, ADX_CHOP, CHOP_TREND, CHOP_CHOP
 from backtest.news import FOMC_DAYS, nfp_days_for_range
-from history import DAY
+from topstep.history import DAY
 
 POLL_SECONDS = 45        # how often to check for a new completed bar
 ET = ZoneInfo(cfg.TZ)
@@ -97,6 +98,12 @@ def atr(h, l, c, period):
 # Day decision (regime + news) — reuses the same logic as daily_plan.py
 # --------------------------------------------------------------------------- #
 def decide_trade_today(token) -> tuple[bool, str]:
+    today_dt = datetime.now(ET)
+    if today_dt.weekday() >= 5:
+        return False, "weekend (no session)"
+    if today_dt.date().isoformat() in cfg.EARLY_CLOSE_DAYS:
+        return False, "early-close day (13:00 ET close — force-flat impossible)"
+
     cid = CONTRACTS[cfg.CONTRACT]
     now = datetime.now(timezone.utc)
     start = (now - timedelta(days=cfg.REGIME_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -219,6 +226,18 @@ def main():
         while True:
             nm = now_min_et()
 
+            # Operator kill switch (dashboard STOP button writes this file)
+            if os.path.exists(cfg.STOP_FLAG_FILE):
+                log("STOP flag detected — flattening (if live) and exiting.")
+                if LIVE:
+                    st = guard.day_state(token, aid)
+                    if st["open_positions"] > 0:
+                        from topstep.positions import close_position
+                        for p in st["positions"]:
+                            close_position(token, aid, p["contractId"])
+                            log(f"STOP: closed {p['contractId']} (size {p.get('size')})")
+                break
+
             # Force-flat at cutoff, then we're done
             if nm >= cfg.FLAT_MIN:
                 actions = guard.force_flat_if_needed(token, aid) if LIVE else []
@@ -265,10 +284,10 @@ def main():
                             oid = guard.place_bracketed(token, aid, cid, side,
                                                         stop_ticks, target_ticks,
                                                         custom_tag=tag)
-                            log(f"PLACED {sig} 1 {cfg.CONTRACT} @~{last} "
+                            log(f"PLACED {sig} {cfg.CONTRACTS_PER_TRADE} {cfg.CONTRACT} @~{last} "
                                 f"stop {stop_ticks}t / target {target_ticks}t | orderId {oid}")
                         else:
-                            log(f"[dry-run] WOULD place {sig} 1 {cfg.CONTRACT} @~{last} "
+                            log(f"[dry-run] WOULD place {sig} {cfg.CONTRACTS_PER_TRADE} {cfg.CONTRACT} @~{last} "
                                 f"stop {stop_ticks}t / target {target_ticks}t (2R bracket)")
                         traded = True
             except Exception as e:

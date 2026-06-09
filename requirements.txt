@@ -2,4 +2,5 @@ requests
 python-dotenv
 pandas
 pyarrow
-yfinance
+numpy
+flask
