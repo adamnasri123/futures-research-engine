@@ -12,6 +12,7 @@ What it does:
 Run:  python -m dashboard.app   (then open http://127.0.0.1:8765)
 """
 import json
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -67,9 +68,33 @@ def _log_tail(n=60):
     if not path.exists():
         return [], None
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    # bot considered "running" if the log was written to in the last 3 minutes
     mtime = path.stat().st_mtime
     return lines[-n:], mtime
+
+
+def _bot_running():
+    """True if a bot instance is alive: fresh heartbeat, OR (during session hours
+    only) today's log shows a session that started and never ended. The log
+    fallback covers pre-heartbeat instances but can't see hard kills, so it is
+    ignored after 16:05 ET — the bot always exits by ~15:56."""
+    hb = ROOT / cfg.HEARTBEAT_FILE
+    try:
+        if time.time() - hb.stat().st_mtime < cfg.HEARTBEAT_FRESH_SEC:
+            return True
+    except OSError:
+        pass
+    now = datetime.now(ET)
+    if now.hour * 60 + now.minute >= 16 * 60 + 5:
+        return False
+    lines, _ = _log_tail(n=500)
+    started = ended = -1
+    for i, ln in enumerate(lines):
+        if "AUTOTRADER START" in ln:
+            started = i
+        if "AUTOTRADER DONE" in ln or "Standing aside" in ln or "FATAL" in ln \
+                or "REFUSED: another autotrader" in ln:
+            ended = i
+    return started >= 0 and ended < started
 
 
 @app.route("/")
@@ -101,8 +126,8 @@ def state():
         mll_floor = st["peak_balance"] - cfg.ACCOUNT_TRAILING_MLL
         cushion = bal - mll_floor
 
-        log_lines, log_mtime = _log_tail()
-        running = log_mtime is not None and (time.time() - log_mtime) < 180
+        log_lines, _ = _log_tail()
+        running = _bot_running()
 
         return jsonify({
             "ok": True,
@@ -137,6 +162,26 @@ def state():
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/start", methods=["POST"])
+def start():
+    """Launch the LIVE bot, detached from the dashboard process. Refuses if an
+    instance is already alive (heartbeat or unfinished session in today's log)."""
+    if _bot_running():
+        return jsonify({"ok": False,
+                        "msg": "REFUSED: the bot already appears to be running. "
+                               "Stop it first (or wait for it to finish) before starting."})
+    if STOP_FLAG.exists():
+        STOP_FLAG.unlink()   # a stale stop flag would kill the new instance instantly
+    py = ROOT / "venv" / "Scripts" / "python.exe"
+    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    subprocess.Popen([str(py), str(ROOT / "autotrader.py"), "--live"],
+                     cwd=str(ROOT), creationflags=flags,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return jsonify({"ok": True,
+                    "msg": "Bot launched LIVE (detached — it keeps running if you close "
+                           "this page). Watch the log panel; entries only 10:45-12:00 ET."})
 
 
 @app.route("/api/stop", methods=["POST"])

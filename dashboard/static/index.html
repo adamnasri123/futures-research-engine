@@ -52,6 +52,8 @@
   #stopBtn { background: var(--red); color: #fff; }
   #stopBtn.resume { background: var(--amber); color: #1c1c1c; }
   #briefBtn { background: var(--blue); color: #fff; }
+  #startBtn { background: var(--green); color: #07210f; }
+  #startBtn:disabled { background: var(--panel2); color: var(--dim2); cursor: not-allowed; }
   button:active { transform: translateY(1px); }
   .btnrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   #msg { font-size: 13px; color: var(--amber); }
@@ -87,6 +89,7 @@
   <div class="card span4">
     <h2>Controls</h2>
     <div class="btnrow">
+      <button id="startBtn" onclick="startBot()">START BOT (live)</button>
       <button id="stopBtn" onclick="stopBot()">STOP BOT</button>
       <button id="briefBtn" onclick="copyBriefing()">Copy analyst briefing</button>
     </div>
@@ -140,6 +143,7 @@ async function refresh() {
     const b = $("stopBtn");
     b.textContent = stopped ? "RESUME (clear stop)" : "STOP BOT";
     b.className = stopped ? "resume" : "";
+    $("startBtn").disabled = s.bot.running;
 
     // account
     const a = s.account;
@@ -206,6 +210,17 @@ async function refresh() {
   } catch (e) {
     $("error").textContent = "dashboard error: " + e.message;
   }
+}
+
+async function startBot() {
+  if (!confirm(
+      "START the bot in LIVE mode?\n\nIt will make its day decision now and may place " +
+      "a REAL bracketed trade if a signal appears in the 10:45-12:00 ET window."))
+    return;
+  const r = await fetch("/api/start", {method: "POST"});
+  const j = await r.json();
+  $("msg").textContent = j.msg;
+  setTimeout(refresh, 2500);
 }
 
 async function stopBot() {

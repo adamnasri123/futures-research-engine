@@ -97,9 +97,12 @@ trades (5/6 exact matches on side, timing, and stop size).
    .\dashboard\run_dashboard.ps1                # opens http://127.0.0.1:8765
    ```
    Shows balance, trailing-drawdown cushion, today's fills with prices/times, open
-   position and working orders, the live bot log, a **STOP BOT** kill switch (flattens
-   and halts the bot within ~45 s), and a one-click **analyst briefing** you can paste
-   into Claude Code for a structured review session.
+   position and working orders, and the live bot log. Controls: **START BOT** (launches
+   the live bot detached; refuses if an instance is already running — the bot also has
+   its own heartbeat-based single-instance lock), **STOP BOT** (flattens and halts the
+   bot within ~45 s; the stop flag persists until you press RESUME, so a stopped bot
+   stays stopped across scheduler restarts), and a one-click **analyst briefing** you
+   can paste into Claude Code for a structured review session.
 
 ## The honest-validation gates (a strategy ships only if it clears ALL)
 

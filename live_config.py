@@ -63,5 +63,10 @@ EARLY_CLOSE_DAYS = {
 # flattens (if live) and exits at the next poll. Created by the dashboard STOP button.
 STOP_FLAG_FILE = "STOP_BOT"
 
+# Single-instance heartbeat: the bot touches this file every poll. A fresh heartbeat
+# makes a second launch refuse to start, and tells the dashboard the bot is alive.
+HEARTBEAT_FILE = "logs/.bot_heartbeat"
+HEARTBEAT_FRESH_SEC = 120
+
 # Session timezone
 TZ = "America/New_York"

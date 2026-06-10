@@ -195,9 +195,36 @@ def bracket_ticks(bars) -> tuple[int, int]:
 
 
 # --------------------------------------------------------------------------- #
+# Single-instance heartbeat — lets the dashboard (and a second launch) know a
+# bot is already alive. Touched every poll; stale after HEARTBEAT_FRESH_SEC.
+# --------------------------------------------------------------------------- #
+def beat():
+    try:
+        os.makedirs(os.path.dirname(cfg.HEARTBEAT_FILE), exist_ok=True)
+        with open(cfg.HEARTBEAT_FILE, "w") as f:
+            f.write(datetime.now(timezone.utc).isoformat())
+    except Exception:
+        pass
+
+
+def another_instance_running() -> bool:
+    try:
+        age = time.time() - os.path.getmtime(cfg.HEARTBEAT_FILE)
+        return age < cfg.HEARTBEAT_FRESH_SEC
+    except OSError:
+        return False
+
+
+# --------------------------------------------------------------------------- #
 # Main loop
 # --------------------------------------------------------------------------- #
 def main():
+    if another_instance_running():
+        log("REFUSED: another autotrader instance appears to be running "
+            f"(heartbeat < {cfg.HEARTBEAT_FRESH_SEC}s old). Exiting.")
+        return
+    beat()
+
     mode = "LIVE (placing real orders)" if LIVE else "DRY-RUN (logging only, no orders)"
     log("=" * 60)
     log(f"AUTOTRADER START — mode: {mode}")
@@ -225,6 +252,7 @@ def main():
         # --- 2. Monitor loop ---
         while True:
             nm = now_min_et()
+            beat()
 
             # Operator kill switch (dashboard STOP button writes this file)
             if os.path.exists(cfg.STOP_FLAG_FILE):
