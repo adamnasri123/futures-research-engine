@@ -199,6 +199,62 @@ def resume():
                                        "its next scheduled start (it does not auto-restart)."})
 
 
+@app.route("/api/advisor/ask", methods=["POST"])
+def advisor_ask():
+    """Build a market snapshot + decision prompt, log a pending ask (PAPER ONLY)."""
+    from tools import paper_advisor as pa
+    try:
+        snap = pa.snapshot()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"snapshot failed: {e}"}), 500
+    prompt = pa.build_prompt(snap)
+    pa._append({"asked_at": datetime.now(ET).isoformat(), "snapshot": snap,
+                "decision": None, "outcome": None})
+    return jsonify({"ok": True, "prompt": prompt,
+                    "msg": "Prompt ready — copy it into Claude Code, then paste the "
+                           "JSON answer below. Nothing trades; this is a paper log."})
+
+
+@app.route("/api/advisor/log", methods=["POST"])
+def advisor_log():
+    """Attach the pasted JSON decision to the last pending ask."""
+    from flask import request
+    from tools import paper_advisor as pa
+    raw = (request.get_json(silent=True) or {}).get("decision", "")
+    try:
+        start, end = raw.index("{"), raw.rindex("}") + 1
+        decision = json.loads(raw[start:end])
+    except (ValueError, json.JSONDecodeError):
+        return jsonify({"ok": False, "error": "could not parse a JSON object from that text"})
+    recs = pa._read()
+    if not recs or recs[-1]["decision"] is not None:
+        return jsonify({"ok": False, "error": "no pending ask — click 'Ask analyst' first"})
+    recs[-1]["decision"] = decision
+    pa._write(recs)
+    return jsonify({"ok": True, "msg": f"Decision logged: {decision.get('action')} "
+                                       f"(conf {decision.get('confidence')}). It will be "
+                                       "scored automatically once resolvable."})
+
+
+@app.route("/api/advisor/score", methods=["POST"])
+def advisor_score():
+    """Resolve decisions against what the market actually did; return scoreboard."""
+    from tools import paper_advisor as pa
+    try:
+        recs, s = pa.score_all()
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    recent = []
+    for r in recs[-8:][::-1]:
+        d = r.get("decision") or {}
+        o = r.get("outcome") or {}
+        recent.append({"asked_at": r["asked_at"][:16], "action": d.get("action"),
+                       "thesis": d.get("thesis", "")[:80],
+                       "result": (f"{o.get('how')} {o.get('usd_1micro', 0):+.2f}$"
+                                  if o else "pending")})
+    return jsonify({"ok": True, "summary": s, "recent": recent})
+
+
 @app.route("/api/briefing")
 def briefing():
     s = state().get_json()

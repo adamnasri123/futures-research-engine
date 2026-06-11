@@ -102,7 +102,11 @@ trades (5/6 exact matches on side, timing, and stop size).
    its own heartbeat-based single-instance lock), **STOP BOT** (flattens and halts the
    bot within ~45 s; the stop flag persists until you press RESUME, so a stopped bot
    stays stopped across scheduler restarts), and a one-click **analyst briefing** you
-   can paste into Claude Code for a structured review session.
+   can paste into Claude Code for a structured review session. An **Analyst panel**
+   runs the paper-advisor experiment from the page: build a market-snapshot prompt,
+   paste the model's JSON decision back, and track a scoreboard of hypothetical
+   P&L — measuring whether an LLM read adds value before it earns any real role.
+   It never places orders.
 
 ## The honest-validation gates (a strategy ships only if it clears ALL)
 

@@ -113,6 +113,30 @@
   </div>
 
   <div class="card span12">
+    <h2>Analyst — paper decisions (never trades; measured vs coin flip &amp; the bot)</h2>
+    <div class="btnrow" style="margin-bottom:10px">
+      <button id="askBtn" onclick="advisorAsk()">Ask analyst (build prompt)</button>
+      <button id="scoreBtn" onclick="advisorScore()">Scoreboard</button>
+      <span class="sub" id="advMsg"></span>
+    </div>
+    <div id="promptBox" style="display:none">
+      <div class="sub">1) Copy this prompt → paste it to Claude Code → 2) paste the JSON answer below:</div>
+      <textarea id="promptText" readonly
+        style="width:100%;height:110px;background:var(--panel2);color:var(--dim2);
+               border:1px solid var(--line);border-radius:8px;font-family:var(--mono);
+               font-size:12px;padding:8px;margin:6px 0"></textarea>
+      <div class="btnrow">
+        <button onclick="copyPrompt()" id="briefBtn2" style="background:var(--blue);color:#fff">Copy prompt</button>
+        <input id="answerText" placeholder='paste the JSON answer here, e.g. {"action":"stand_aside",...}'
+          style="flex:1;min-width:260px;background:var(--panel2);color:var(--text);
+                 border:1px solid var(--line);border-radius:8px;padding:9px;font-family:var(--mono);font-size:12px">
+        <button onclick="advisorLog()" style="background:var(--green);color:#07210f">Log decision</button>
+      </div>
+    </div>
+    <div id="scoreBox" class="sub" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card span12">
     <h2>Bot log (today)</h2>
     <div id="log">no log yet</div>
     <div class="err" id="error"></div>
@@ -242,6 +266,47 @@ async function copyBriefing() {
   await navigator.clipboard.writeText(j.text);
   $("msg").textContent =
     "Briefing copied — paste it to Claude Code (VS Code Claude panel) in the topstep-bot project.";
+}
+
+async function advisorAsk() {
+  $("advMsg").textContent = "building snapshot…";
+  const r = await fetch("/api/advisor/ask", {method: "POST"});
+  const j = await r.json();
+  if (!j.ok) { $("advMsg").textContent = "error: " + j.error; return; }
+  $("promptBox").style.display = "block";
+  $("promptText").value = j.prompt;
+  $("advMsg").textContent = j.msg;
+}
+
+async function copyPrompt() {
+  await navigator.clipboard.writeText($("promptText").value);
+  $("advMsg").textContent = "Prompt copied — paste it to Claude Code.";
+}
+
+async function advisorLog() {
+  const r = await fetch("/api/advisor/log", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({decision: $("answerText").value}),
+  });
+  const j = await r.json();
+  $("advMsg").textContent = j.ok ? j.msg : "error: " + j.error;
+  if (j.ok) { $("answerText").value = ""; $("promptBox").style.display = "none"; }
+}
+
+async function advisorScore() {
+  $("advMsg").textContent = "scoring…";
+  const r = await fetch("/api/advisor/score", {method: "POST"});
+  const j = await r.json();
+  if (!j.ok) { $("advMsg").textContent = "error: " + j.error; return; }
+  const s = j.summary;
+  let html = `decisions ${s.decisions} · scored ${s.scored} · stand-aside ${s.stand_aside}`;
+  if (s.scored > 0)
+    html += ` · hypothetical P&L <b>$${s.total_usd}</b> (avg $${s.avg_usd}, ` +
+            `win ${s.wins}/${s.scored}) — verdict needs n≥30`;
+  html += "<br>" + j.recent.map(r =>
+      `${r.asked_at} · ${r.action || "—"} · ${r.result} · ${r.thesis || ""}`).join("<br>");
+  $("scoreBox").innerHTML = html;
+  $("advMsg").textContent = "";
 }
 
 refresh();

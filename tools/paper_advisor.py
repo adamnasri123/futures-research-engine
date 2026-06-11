@@ -123,7 +123,8 @@ def cmd_log(payload):
     print("decision attached to last ask.")
 
 
-def cmd_score():
+def score_all():
+    """Resolve all resolvable decisions; return (records, summary dict)."""
     recs = _read()
     token = get_session_token()
     cid = CONTRACTS[cfg.CONTRACT]
@@ -165,12 +166,24 @@ def cmd_score():
 
     scored = [r for r in recs if r["outcome"]]
     aside = sum(1 for r in recs if r.get("decision") and r["decision"].get("action") == "stand_aside")
-    print(f"decisions: {len(recs)} | scored: {len(scored)} (+{changed} new) | stand_aside: {aside}")
-    if scored:
-        pnl = [r["outcome"]["usd_1micro"] for r in scored]
-        wins = sum(1 for p in pnl if p > 0)
-        print(f"hypothetical 1-micro P&L: total ${sum(pnl):.2f} | avg ${np.mean(pnl):.2f} | "
-              f"win {wins}/{len(scored)}")
+    pnl = [r["outcome"]["usd_1micro"] for r in scored]
+    summary = {
+        "decisions": len(recs), "scored": len(scored), "newly_scored": changed,
+        "stand_aside": aside,
+        "total_usd": round(sum(pnl), 2) if pnl else 0,
+        "avg_usd": round(float(np.mean(pnl)), 2) if pnl else 0,
+        "wins": sum(1 for p in pnl if p > 0),
+    }
+    return recs, summary
+
+
+def cmd_score():
+    recs, s = score_all()
+    print(f"decisions: {s['decisions']} | scored: {s['scored']} (+{s['newly_scored']} new) | "
+          f"stand_aside: {s['stand_aside']}")
+    if s["scored"]:
+        print(f"hypothetical 1-micro P&L: total ${s['total_usd']:.2f} | avg ${s['avg_usd']:.2f} | "
+              f"win {s['wins']}/{s['scored']}")
         print("verdict requires n>=30 AND beating both a coin flip and the bot baseline.")
 
 
