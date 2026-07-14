@@ -68,6 +68,22 @@ reaction. Retail edge, if it exists for us, must come from: (a) NOT trading (day
 selection, risk caps — proven useful), (b) much lower frequency (weekly+ holds where
 a 0.6-pt cost is trivial vs a 50-pt target), or (c) information beyond price history.
 
+## Addendum (2026-07-14): externally-sourced candidates, computed
+
+A sourced web-research sweep identified the two strongest published survivors; both
+were tested same-day (`backtest/meanrev.py`, `backtest/noise_area.py`):
+
+- **Multi-day tail mean reversion** (Baltussen et al., JFE 2019): the mechanism is
+  **confirmed alive** on 1980–2026 daily data — index serial dependence is negative in
+  every era since 1995, strongest recently (2020–24 lag-1 AC −0.18, t=−6.4). The
+  long-tail trade is positive OOS (+0.29%/trade, 78% win) but its timing alpha over
+  drift-matched random longs is small, and EOD-marked drawdowns **breach a $2,000
+  trailing MLL even at 1 micro**. Real effect, incompatible with prop-eval risk limits.
+- **Noise-area intraday momentum** (Zarattini et al. 2024): fixed-rule replication on
+  our 1-min window is **negative** (PF 0.85–0.89; the churn variant's entire loss ≈
+  costs). Consistent with the effect living in high-vol regimes and institutional cost
+  structures.
+
 **Paper-phase plan derived from this:** run the mechanical bot as baseline; log
 analyst (Claude) daily reads via the advisor tool and *score them* against a coin
 flip over 30+ paper trades before believing anything; backlog = extension filter on
