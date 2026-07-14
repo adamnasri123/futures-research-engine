@@ -17,14 +17,14 @@ POINT_VALUE   = 5.0           # $ per index point (4 ticks)
 DAILY_LOSS_CAP    = 500.0     # stop trading for the day at -$500 realized
 DAILY_PROFIT_CAP  = 1500.0    # stop trading for the day at +$1500 (consistency rule)
 MAX_TRADES_PER_DAY = 2        # 2 trades max
-CONTRACTS_PER_TRADE = 5       # user-chosen 5 micros (HIGH accepted eval risk — eyes open).
-                              # 2026-06-09 faithful-replay numbers (best config, 10:45+):
-                              # worst single trade -$1891 ≈ one fill from MLL breach; a
-                              # NORMAL losing cluster breaches the $2000 trailing MLL by
-                              # ~OOS trade #6-8 at this size. 1 micro is the only size
-                              # that survives historically. User informed, chose 5. See
-                              # ANALYST_JOURNAL 2026-06-09 + logs/RESEARCH_LOG.md.
-MAX_CONTRACTS_HARD = 5        # absolute ceiling — code must never place more than this
+CONTRACTS_PER_TRADE = 3       # user-chosen 3 micros for eval #2 (2026-07-14). Honest
+                              # numbers (faithful replay, best config): 1-micro OOS
+                              # maxDD ~-$1,200 -> ~-$3,600 at 3 micros vs the $2,000
+                              # trailing MLL = still breaches on a normal losing
+                              # cluster; worst single trade ~-$1,135. 1 micro remains
+                              # the only historically survivable size. User informed,
+                              # chose 3. See ANALYST_JOURNAL 2026-07-14.
+MAX_CONTRACTS_HARD = 3        # absolute ceiling — code must never place more than this
 
 # TopStep 50k eval account
 ACCOUNT_TRAILING_MLL = 2000.0  # never let equity fall $2000 from peak

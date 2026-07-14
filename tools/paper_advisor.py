@@ -35,7 +35,7 @@ import numpy as np
 
 import live_config as cfg
 from topstep.auth import get_session_token
-from topstep.contracts import CONTRACTS
+from topstep.contracts import resolve_contract
 from topstep.history import get_bars, MINUTE, DAY
 
 ET = ZoneInfo(cfg.TZ)
@@ -47,7 +47,7 @@ DECISION_SCHEMA = ('{"action":"long|short|stand_aside","stop_pts":<float>,'
 
 def snapshot():
     token = get_session_token()
-    cid = CONTRACTS[cfg.CONTRACT]
+    cid = resolve_contract(token, cfg.CONTRACT)
     now = datetime.now(timezone.utc)
     bars5 = sorted(get_bars(token, cid, (now - timedelta(hours=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                             now.strftime("%Y-%m-%dT%H:%M:%SZ"), unit=MINUTE, unit_number=5,
@@ -127,7 +127,7 @@ def score_all():
     """Resolve all resolvable decisions; return (records, summary dict)."""
     recs = _read()
     token = get_session_token()
-    cid = CONTRACTS[cfg.CONTRACT]
+    cid = resolve_contract(token, cfg.CONTRACT)
     changed = 0
     for r in recs:
         if r["outcome"] is not None or not r.get("decision") or \

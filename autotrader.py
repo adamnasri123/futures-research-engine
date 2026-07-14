@@ -32,7 +32,7 @@ import numpy as np
 
 from topstep.auth import get_session_token
 from topstep.accounts import get_accounts
-from topstep.contracts import CONTRACTS
+from topstep.contracts import resolve_contract
 from topstep.history import get_bars, MINUTE
 from topstep.orders import BID, ASK
 import live_config as cfg
@@ -43,6 +43,17 @@ from topstep.history import DAY
 
 POLL_SECONDS = 45        # how often to check for a new completed bar
 ET = ZoneInfo(cfg.TZ)
+
+_CID = None
+
+
+def cid_for(token) -> str:
+    """Active front-month contract id, resolved once per run via the API (falls
+    back to the static map). Prevents trading/polling an expired contract."""
+    global _CID
+    if _CID is None:
+        _CID = resolve_contract(token, cfg.CONTRACT)
+    return _CID
 
 LIVE = "--live" in sys.argv
 LOG_PATH = f"logs/autotrader_{datetime.now(ET).date().isoformat()}.log"
@@ -104,12 +115,29 @@ def decide_trade_today(token) -> tuple[bool, str]:
     if today_dt.date().isoformat() in cfg.EARLY_CLOSE_DAYS:
         return False, "early-close day (13:00 ET close — force-flat impossible)"
 
-    cid = CONTRACTS[cfg.CONTRACT]
+    cid = cid_for(token)
     now = datetime.now(timezone.utc)
     start = (now - timedelta(days=cfg.REGIME_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
     end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     bars = sorted(get_bars(token, cid, start, end, unit=DAY, unit_number=1, limit=120,
                            include_partial=False), key=lambda b: b["t"])
+    if len(bars) < cfg.REGIME_MIN_BARS:
+        # Fresh front month after a roll: stitch the previous quarter's daily bars
+        # (dates strictly before the new contract's first bar) so ADX/Chop have
+        # enough history. One basis gap at the seam — tolerable for regime.
+        try:
+            from topstep.contracts import previous_quarter
+            prev = previous_quarter(cid)
+            old = sorted(get_bars(token, prev, start, end, unit=DAY, unit_number=1,
+                                  limit=120, include_partial=False), key=lambda b: b["t"])
+            first_new = bars[0]["t"] if bars else "9999"
+            stitched = [b for b in old if b["t"] < first_new] + bars
+            if len(stitched) >= cfg.REGIME_MIN_BARS:
+                log(f"Regime history stitched: {len(bars)} bars from {cid} + "
+                    f"{len(stitched) - len(bars)} from {prev}")
+                bars = stitched
+        except Exception as e:
+            log(f"Regime stitch failed ({e}) — falling back to short history.")
     if len(bars) < cfg.REGIME_MIN_BARS:
         return False, f"insufficient daily bars ({len(bars)})"
 
@@ -142,7 +170,7 @@ def decide_trade_today(token) -> tuple[bool, str]:
 # Intraday bars + entry signal
 # --------------------------------------------------------------------------- #
 def recent_5m(token):
-    cid = CONTRACTS[cfg.CONTRACT]
+    cid = cid_for(token)
     now = datetime.now(timezone.utc)
     start = (now - timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%SZ")
     end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -238,7 +266,7 @@ def main():
             return
         acct = accts[0]
         aid = acct["id"]
-        cid = CONTRACTS[cfg.CONTRACT]
+        cid = cid_for(token)
         log(f"Account {acct['name']} | balance ${acct['balance']:,.2f} | {cfg.CONTRACT} ({cid})")
 
         # --- 1. Day decision ---

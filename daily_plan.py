@@ -19,7 +19,7 @@ import numpy as np
 
 from topstep.auth import get_session_token
 from topstep.accounts import get_accounts
-from topstep.contracts import CONTRACTS
+from topstep.contracts import resolve_contract
 from topstep.history import get_bars, DAY
 from backtest.regime import _adx, _choppiness, ADX_TREND, ADX_CHOP, CHOP_TREND, CHOP_CHOP
 from backtest.news import FOMC_DAYS, nfp_days_for_range, FOMC_ANNOUNCE_MIN
@@ -33,7 +33,7 @@ def _today_et():
 def _classify_today(token) -> dict:
     """Pull recent daily bars for the front-month and classify today's regime
     using indicators through the last COMPLETED session (causal)."""
-    cid = CONTRACTS[cfg.CONTRACT]
+    cid = resolve_contract(token, cfg.CONTRACT)
     now = datetime.now(ZoneInfo("UTC"))
     start = (now - timedelta(days=cfg.REGIME_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
     end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
