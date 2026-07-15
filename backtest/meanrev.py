@@ -147,6 +147,50 @@ def dollar_sim(df, trades, micros, y0=2016, y1=2026):
     return a.sum(), dd, breach_day is not None
 
 
+def swing_sim(df, trades, micros, trail_amt, trailing=True, churn=True,
+              realtime_marks=False, y0=2016, y1=2026):
+    """Generalized prop-rule survivability sim for the LONG tail strategy.
+    trail_amt: drawdown allowance. trailing: floor trails peak (else static).
+    churn: TopStep-style forced daily flatten cost. realtime_marks: check the
+    floor against intraday LOWS while holding (approximates real-time trailing
+    drawdown, e.g. Apex) instead of EOD closes (TopStep/most swing accounts)."""
+    c = df.close.to_numpy(); lo = df.low.to_numpy()
+    yrs = df.date.dt.year.to_numpy()
+    pos = np.zeros(len(df))
+    entry_days = set()
+    for t in trades:
+        if y0 <= t["year"] <= y1:
+            pos[t["entry_i"]:t["exit_i"]] = 1
+            entry_days.add(t["entry_i"])
+    eq = peak = 0.0
+    floor = -trail_amt
+    breach = False
+    tot_cost = 0.0
+    for i in range(1, len(df)):
+        if not (y0 <= yrs[i] <= y1):
+            continue
+        pnl = pos[i - 1] * (c[i] - c[i - 1]) * POINT_VALUE * micros
+        if pos[i - 1] and churn:
+            cost = OVERNIGHT_BP / 10000 * c[i] * POINT_VALUE * micros
+            pnl -= cost; tot_cost += cost
+        if (i - 1) in entry_days:                      # entry+exit RT, charged once
+            cost = RT_COST_BP / 10000 * c[i - 1] * POINT_VALUE * micros
+            pnl -= cost; tot_cost += cost
+        # intraday worst mark while holding (for real-time trailing rules)
+        if pos[i - 1] and realtime_marks:
+            worst = eq + pos[i - 1] * (lo[i] - c[i - 1]) * POINT_VALUE * micros
+            if worst < floor:
+                breach = True
+        eq += pnl
+        if eq > peak:
+            peak = eq
+            if trailing:
+                floor = peak - trail_amt
+        if eq < floor:
+            breach = True
+    return eq, tot_cost, breach
+
+
 def main():
     df = load_spx()
     print(f"SPX daily: {len(df)} days {df.date.iloc[0].date()} .. {df.date.iloc[-1].date()}\n")
@@ -210,6 +254,29 @@ def main():
         tot, dd, breach = dollar_sim(df, tr, m)
         print(f"    {m} micro(s): net ${tot:,.0f} | maxDD ${dd:,.0f} | "
               f"$2,000 trailing-MLL breach: {'YES' if breach else 'no'}")
+
+    print("\n" + "=" * 88)
+    print("  PART 3 — PROP-RULE SURVIVABILITY GRID (2016-2026, LONG tail strategy)")
+    print("  TopStep = $2k trailing + forced daily flatten churn. Swing-style accounts")
+    print("  allow multi-day holds (no churn); most use EOD-trailing drawdown; Apex-style")
+    print("  trails in real time (checked vs intraday lows here).")
+    print("=" * 88)
+    rules = [
+        ("TopStep-like: $2.0k trail EOD + churn", 2000, True, True, False),
+        ("Swing: $2.5k trail EOD, no churn",       2500, True, False, False),
+        ("Swing: $3.0k trail EOD, no churn",       3000, True, False, False),
+        ("Swing: $4.0k STATIC, no churn",          4000, False, False, False),
+        ("Apex-like: $2.5k trail REAL-TIME",       2500, True, False, True),
+    ]
+    print(f"  {'rule set':<42}{'1 micro':>16}{'2 micros':>16}{'3 micros':>16}")
+    for name, amt, trail, churn, rt in rules:
+        cells = []
+        for m in (1, 2, 3):
+            net, cost, breach = swing_sim(df, tr, m, amt, trail, churn, rt)
+            cells.append(f"{'DEAD' if breach else f'${net:,.0f}'}")
+        print(f"  {name:<42}{cells[0]:>16}{cells[1]:>16}{cells[2]:>16}")
+    print("  DEAD = drawdown floor breached at some point in the decade (account lost).")
+    print("  Surviving cells show decade net P&L after costs at that size.")
 
     print("\n  NOTE: entries/exits at daily closes; MES only exists since 2019 — earlier")
     print("  years are signal validation, not literal P&L. Gates: OOS positive with t>=2,")

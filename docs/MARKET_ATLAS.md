@@ -79,6 +79,13 @@ were tested same-day (`backtest/meanrev.py`, `backtest/noise_area.py`):
   long-tail trade is positive OOS (+0.29%/trade, 78% win) but its timing alpha over
   drift-matched random longs is small, and EOD-marked drawdowns **breach a $2,000
   trailing MLL even at 1 micro**. Real effect, incompatible with prop-eval risk limits.
+
+  *Prop-rule survivability grid (added 2026-07-15, `meanrev.py` PART 3, 2016–2026):*
+  TopStep-style $2k trailing = DEAD at every size; Apex-style $2.5k real-time trailing
+  = DEAD; swing-style $3k EOD-trailing survives at 1 micro (+$7.8k/decade net); $4k
+  static survives at 1–2 micros (+$15.7k at 2). So the strategy is only compatible
+  with swing-permissive accounts with ≥$3k EOD-based drawdown — and even there, the
+  random-long control caveat stands (drift capture, unproven timing alpha).
 - **Noise-area intraday momentum** (Zarattini et al. 2024): fixed-rule replication on
   our 1-min window is **negative** (PF 0.85–0.89; the churn variant's entire loss ≈
   costs). Consistent with the effect living in high-vol regimes and institutional cost
